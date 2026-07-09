@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TravelMind v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:'Inter',sans-serif;background:#F5F5F4;color:#1C1917;overflow:hidden}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:#D6D3D1;border-radius:2px}
+.app{display:flex;height:100vh;width:100vw}
+/* LEFT SIDEBAR */
+.sidebar{width:340px;min-width:340px;display:flex;flex-direction:column;border-right:1px solid #E7E5E4;background:#FAFAF9}
+.sidebar-header{height:56px;min-height:56px;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid #E7E5E4}
+.sidebar-header .avatar{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#1E3A5F,#4A8BC2);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;flex-shrink:0}
+.sidebar-header .info{flex:1;min-width:0}
+.sidebar-header .name{font-size:14px;font-weight:700;line-height:1.2}
+.sidebar-header .sub{font-size:11px;color:#A8A29E}
+.sidebar-header .close-btn{width:28px;height:28px;border-radius:8px;border:none;background:none;cursor:pointer;color:#A8A29E;display:flex;align-items:center;justify-content:center;font-size:16px}
+.sidebar-header .close-btn:hover{background:#E7E5E4}
+.msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.msgs .msg{display:flex;gap:10px;align-items:flex-start}
+.msgs .msg.own{flex-direction:row-reverse}
+.msgs .msg-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:2px}
+.msgs .msg-bubble{max-width:88%;padding:12px 14px;font-size:13px;line-height:1.6;border-radius:14px}
+.msgs .msg-bubble.ai{background:white;border:1px solid #E7E5E4;border-bottom-left-radius:4px;color:#1C1917}
+.msgs .msg-bubble.user{background:linear-gradient(135deg,#1E3A5F,#2D5A8E);color:white;border-bottom-right-radius:4px}
+.msgs .msg-bubble .live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#22C55E;position:relative;margin-right:6px}
+.msgs .msg-bubble .live-dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid #22C55E;animation:pls 2s infinite}
+@keyframes pls{0%{transform:scale(1);opacity:1}100%{transform:scale(2);opacity:0}}
+.quick-row{padding:8px 14px;display:flex;gap:6px;flex-wrap:wrap;border-top:1px solid #E7E5E4}
+.quick-row .chip{padding:4px 12px;border-radius:14px;font-size:11px;border:1px solid #E7E5E4;background:white;cursor:pointer;transition:all .15s;color:#78716C}
+.quick-row .chip:hover{border-color:#1E3A5F;color:#1E3A5F}
+.input-row{padding:12px 14px;border-top:1px solid #E7E5E4}
+.input-wrap{display:flex;align-items:center;gap:6px;background:white;border:1.5px solid #E7E5E4;border-radius:12px;padding:3px;transition:all .2s}
+.input-wrap:focus-within{border-color:#1E3A5F;box-shadow:0 0 0 3px rgba(30,58,95,0.08)}
+.input-wrap input{flex:1;border:none;outline:none;background:transparent;font-size:13px;padding:5px 10px;color:#1C1917}
+.input-wrap input::placeholder{color:#A8A29E}
+.input-wrap button{width:34px;height:34px;border-radius:10px;border:none;background:linear-gradient(135deg,#1E3A5F,#4A8BC2);color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.input-wrap button:hover{transform:scale(1.05)}
+.input-wrap button svg{width:14px;height:14px;fill:none;stroke:white;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+/* MAIN AREA */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#FAFAF9}
+.main-nav{height:56px;min-height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #E7E5E4;background:white}
+.main-nav .left{display:flex;align-items:center;gap:12px}
+.main-nav .left .logo{font-weight:800;font-size:18px;color:#1E3A5F}
+.main-nav .left .sep{width:1px;height:20px;background:#E7E5E4}
+.main-nav .left .status{display:flex;align-items:center;gap:6px;font-size:12px;color:#78716C}
+.main-nav .left .status .dot{width:7px;height:7px;border-radius:50%;background:#22C55E;position:relative}
+.main-nav .left .status .dot::after{content:'';position:absolute;inset:-2px;border-radius:50%;border:2px solid #22C55E;animation:pls 2s infinite}
+.main-nav .right{display:flex;align-items:center;gap:8px}
+.main-nav .right .agent-count{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:8px;background:#F5F5F4;font-size:12px;font-weight:500;color:#78716C}
+.main-nav .right .agent-count .num{font-weight:700;color:#1E3A5F}
+.main-nav .right .user-icon{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#1E3A5F,#4A8BC2);display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:600}
+.scroll-area{flex:1;overflow-y:auto;padding:20px 24px}
+/* HERO COMPACT */
+.hero{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-radius:12px;background:linear-gradient(135deg,#1E3A5F,#2D5A8E);color:white;margin-bottom:20px}
+.hero .h-main{display:flex;align-items:center;gap:14px}
+.hero .h-main .icon{font-size:28px}
+.hero .h-main .info h1{font-size:22px;font-weight:800;letter-spacing:-0.3px}
+.hero .h-main .info .tags{display:flex;gap:6px;margin-top:5px}
+.hero .h-main .info .tags span{padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500;background:rgba(255,255,255,0.15)}
+.hero .h-data{text-align:right}
+.hero .h-data .lbl{font-size:11px;opacity:.6}
+.hero .h-data .amt{font-size:26px;font-weight:800;letter-spacing:-0.5px}
+.hero .h-data .sav{font-size:11px;color:#86EFAC;font-weight:500}
+/* TABS */
+.tab-row{display:flex;gap:2px;margin-bottom:16px;border-bottom:1px solid #E7E5E4}
+.tab-row button{padding:9px 18px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;color:#78716C;position:relative;transition:all .15s;border-bottom:2px solid transparent}
+.tab-row button:hover{color:#1C1917}
+.tab-row button.active{color:#1E3A5F;font-weight:600;border-bottom-color:#1E3A5F}
+/* GRID */
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.card{border-radius:12px;background:white;border:1px solid #E7E5E4;overflow:hidden;transition:all .2s}
+.card:hover{box-shadow:0 8px 30px -12px rgba(0,0,0,0.1)}
+.card-h{padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #E7E5E4}
+.card-h .num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;flex-shrink:0}
+.card-h .num.blue{background:linear-gradient(135deg,#1E3A5F,#4A8BC2)}
+.card-h .num.gray{background:linear-gradient(135deg,#78716C,#A8A29E)}
+.card-h .t-info .t-title{font-size:14px;font-weight:600}
+.card-h .t-info .t-date{font-size:11px;color:#A8A29E;margin-top:1px}
+.card-b{padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.card-b .act{display:flex;gap:10px;align-items:flex-start}
+.card-b .act .tm{font-size:11px;font-weight:600;width:48px;flex-shrink:0;padding-top:1px}
+.card-b .act .tm.mor{color:#4A8BC2}
+.card-b .act .tm.aft{color:#D97706}
+.card-b .act .tm.eve{color:#7C3AED}
+.card-b .act .d p{font-size:13px;font-weight:500;line-height:1.3}
+.card-b .act .d .s{font-size:11px;color:#A8A29E;margin-top:1px}
+/* Table card */
+.table-wrap{padding:0}
+.table-wrap .t-h{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #E7E5E4}
+.table-wrap .t-h .tl{display:flex;align-items:center;gap:8px}
+.table-wrap .t-h .tl .ico{font-size:18px}
+.table-wrap .t-h .tl .tx{font-size:13px;font-weight:600}
+.table-wrap .t-h .badge{padding:3px 10px;border-radius:10px;font-size:10px;font-weight:600}
+.table-wrap .t-h .badge.green{background:#D1FAE5;color:#065F46}
+.table-wrap .t-h .badge.amber{background:#FEF3C7;color:#B45309}
+.table-wrap table{width:100%;border-collapse:collapse;font-size:12px}
+.table-wrap table th{padding:8px 16px;text-align:left;font-weight:500;color:#A8A29E;font-size:11px;border-bottom:1px solid #E7E5E4}
+.table-wrap table td{padding:10px 16px;border-bottom:1px solid #F5F5F4;font-size:12px}
+.table-wrap table tr:last-child td{border-bottom:none}
+.table-wrap table .rec{display:inline-flex;align-items:center;gap:4px}
+.table-wrap table .rec .star{color:#D97706;font-size:10px}
+.table-wrap table .pr{font-weight:700;color:#1E3A5F}
+.table-wrap table .pr.green{color:#059669}
+/* Tall card (packing/tall content) */
+.tall-card{padding:16px}
+.tall-card .t-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.tall-card .t-hdr .tl{display:flex;align-items:center;gap:8px}
+.tall-card .t-hdr .tl .ico{font-size:18px}
+.tall-card .t-hdr .tl .tx{font-size:13px;font-weight:600}
+.tall-card .t-hdr .badge{padding:3px 10px;border-radius:10px;font-size:10px;font-weight:600}
+.tall-card .t-hdr .badge.amber{background:#FEF3C7;color:#B45309}
+.tall-card .t-hdr .badge.green{background:#D1FAE5;color:#065F46}
+.tall-card .grid-2i{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.tall-card .g-sec .g-title{font-size:10px;font-weight:600;color:#A8A29E;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.tall-card .g-sec .item{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px}
+.tall-card .g-sec .item .ck{width:16px;height:16px;border-radius:4px;background:#D1FAE5;display:flex;align-items:center;justify-content:center;color:#065F46;font-size:10px;font-weight:700;flex-shrink:0}
+.tall-card .footnote{margin-top:14px;padding-top:12px;border-top:1px solid #E7E5E4;font-size:11px;color:#A8A29E;display:flex;align-items:center;gap:6px}
+/* Visa card */
+.visa-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}
+.visa-grid .v-item .v-lbl{font-size:10px;font-weight:600;color:#A8A29E;text-transform:uppercase;margin-bottom:4px}
+.visa-grid .v-item .v-val{font-size:13px}
+.visa-note{margin:0 16px 14px;padding-top:12px;border-top:1px solid #E7E5E4;font-size:11px;color:#A8A29E}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="avatar">🧳</div>
+      <div class="info"><div class="name">旅行对话</div><div class="sub">多智能体协作中</div></div>
+      <button class="close-btn">+</button>
+    </div>
+    <div class="msgs">
+      <div class="msg"><div class="msg-avatar" style="background:linear-gradient(135deg,#1E3A5F,#4A8BC2);color:white">🧳</div><div class="msg-bubble ai"><span class="live-dot"></span>你好！我是 TravelMind。<br>告诉我你想去哪里旅行 ✨</div></div>
+      <div class="msg own"><div class="msg-avatar" style="background:linear-gradient(135deg,#D97706,#EA580C);color:white">王</div><div class="msg-bubble user">我想去日本东京玩5天，预算1万左右，喜欢美食和购物</div></div>
+      <div class="msg"><div class="msg-avatar" style="background:linear-gradient(135deg,#1E3A5F,#4A8BC2);color:white">🧳</div><div class="msg-bubble ai">好的！已为你规划了 <strong>东京 5 天</strong> 的完整方案，右侧查看详情 ↓</div></div>
+    </div>
+    <div class="quick-row">
+      <span class="chip">🇯🇵 东京5天</span><span class="chip">🇹🇭 曼谷美食</span><span class="chip">🇫🇷 巴黎蜜月</span><span class="chip">🇸🇬 新加坡4天</span>
+    </div>
+    <div class="input-row">
+      <div class="input-wrap">
+        <input type="text" placeholder="输入旅行需求..." value="想去日本东京玩5天">
+        <button><svg viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2z"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="main-nav">
+      <div class="left">
+        <div class="logo">TravelMind</div>
+        <div class="sep"></div>
+        <div class="status"><span class="dot"></span>DeepSeek 已连接</div>
+      </div>
+      <div class="right">
+        <div class="agent-count"><span class="num">8</span> Agents 活跃 <span style="margin-left:4px;font-size:10px;color:#A8A29E">🧠 → 📋 → 📝</span></div>
+        <div class="user-icon">王</div>
+      </div>
+    </div>
+
+    <div class="scroll-area">
+      <!-- HERO -->
+      <div class="hero">
+        <div class="h-main">
+          <div class="icon">🗾</div>
+          <div class="info">
+            <h1>东京 5 日旅行方案</h1>
+            <div class="tags"><span>🌸 樱花季</span><span>🍜 美食之旅</span><span>🛍 购物推荐</span><span>🎯 预算友好</span></div>
+          </div>
+        </div>
+        <div class="h-data">
+          <div class="lbl">预算参考</div>
+          <div class="amt">¥8,500</div>
+          <div class="sav">低于预算 ¥1,500</div>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="tab-row">
+        <button class="active">📋 行程总览</button>
+        <button>💰 费用明细</button>
+        <button>🎒 行李清单</button>
+        <button>📍 实用信息</button>
+      </div>
+
+      <!-- 3 DAY CARDS -->
+      <div class="grid-3">
+        <div class="card"><div class="card-h"><div class="num blue">1</div><div class="t-info"><div class="t-title">抵达 · 初探东京</div><div class="t-date">3月15日</div></div></div><div class="card-b"><div class="act"><span class="tm mor">☀ 上午</span><div class="d"><p>抵达成田机场</p><div class="s">机场快线前往市区</div></div></div><div class="act"><span class="tm aft">🌤 下午</span><div class="d"><p>浅草寺 · 仲见世通</p><div class="s">江户风情，人形烧</div></div></div><div class="act"><span class="tm eve">🌙 晚上</span><div class="d"><p>晴空塔夜景</p><div class="s">俯瞰东京全景</div></div></div></div></div>
+        <div class="card"><div class="card-h"><div class="num gray">2</div><div class="t-info"><div class="t-title">经典 · 新宿涩谷</div><div class="t-date">3月16日</div></div></div><div class="card-b"><div class="act"><span class="tm mor">☀ 上午</span><div class="d"><p>明治神宫</p><div class="s">东京最大神社</div></div></div><div class="act"><span class="tm aft">🌤 下午</span><div class="d"><p>涩谷 · 原宿</p><div class="s">十字路口 & 竹下通</div></div></div><div class="act"><span class="tm eve">🌙 晚上</span><div class="d"><p>新宿居酒屋</p><div class="s">地道居酒屋文化</div></div></div></div></div>
+        <div class="card"><div class="card-h"><div class="num gray">3</div><div class="t-info"><div class="t-title">文化 · 秋叶原银座</div><div class="t-date">3月17日</div></div></div><div class="card-b"><div class="act"><span class="tm mor">☀ 上午</span><div class="d"><p>秋叶原电器街</p><div class="s">动漫 & 电器天堂</div></div></div><div class="act"><span class="tm aft">🌤 下午</span><div class="d"><p>银座高端购物</p><div class="s">三越百货</div></div></div><div class="act"><span class="tm eve">🌙 晚上</span><div class="d"><p>东京塔夜景</p><div class="s">六本木展望台</div></div></div></div></div>
+      </div>
+
+      <!-- BOTTOM 2x2 GRID -->
+      <div class="grid-2">
+        <!-- FLIGHTS - tall table -->
+        <div class="card table-wrap">
+          <div class="t-h"><div class="tl"><span class="ico">✈️</span><span class="tx">航班推荐</span></div><span class="badge green">最低 ¥2,500</span></div>
+          <table><thead><tr><th>航班</th><th>时间</th><th style="text-align:right">价格</th></tr></thead><tbody>
+            <tr><td><span class="rec"><span>东方航空 MU523</span><span class="star">★ 推荐</span></span></td><td>14:20–18:35</td><td style="text-align:right"><span class="pr green">¥2,500</span></td></tr>
+            <tr><td>国航 CA925</td><td>08:30–12:50</td><td style="text-align:right"><span class="pr">¥2,800</span></td></tr>
+            <tr><td>全日空 NH920</td><td>09:00–13:10</td><td style="text-align:right"><span class="pr">¥3,200</span></td></tr>
+          </tbody></table>
+        </div>
+        <!-- PACKING - tall content card -->
+        <div class="card">
+          <div class="tall-card">
+            <div class="t-hdr"><div class="tl"><span class="ico">🎒</span><span class="tx">行李清单</span></div><span class="badge amber">建议携带</span></div>
+            <div class="grid-2i">
+              <div class="g-sec"><div class="g-title">📄 必备证件</div>
+                <div class="item"><span class="ck">✓</span>护照/签证</div><div class="item"><span class="ck">✓</span>机票行程单</div>
+                <div class="item"><span class="ck">✓</span>日元现金</div><div class="item"><span class="ck">✓</span>信用卡</div>
+              </div>
+              <div class="g-sec"><div class="g-title">👔 穿搭建议</div>
+                <div class="item"><span class="ck">✓</span>舒适步行鞋</div><div class="item"><span class="ck">✓</span>防晒帽/墨镜</div>
+                <div class="item"><span class="ck">✓</span>轻薄外套</div><div class="item"><span class="ck">✓</span>转换插头</div>
+              </div>
+            </div>
+            <div class="footnote">🌤 东京 3 月 8–13°C，建议薄外套 + 长袖叠穿</div>
+          </div>
+        </div>
+        <!-- HOTELS -->
+        <div class="card table-wrap">
+          <div class="t-h"><div class="tl"><span class="ico">🏨</span><span class="tx">酒店推荐</span></div><span class="badge green">¥400/晚起</span></div>
+          <table><thead><tr><th>酒店</th><th>评分</th><th style="text-align:right">价格/晚</th></tr></thead><tbody>
+            <tr><td>浅草微笑酒店 <span style="color:#A8A29E;font-size:11px">★★★</span></td><td>4.0</td><td style="text-align:right"><span class="pr green">¥400</span></td></tr>
+            <tr><td>新宿华盛顿酒店 <span style="color:#A8A29E;font-size:11px">★★★</span></td><td>4.2</td><td style="text-align:right"><span class="pr">¥600</span></td></tr>
+            <tr><td>东京湾希尔顿 <span style="color:#A8A29E;font-size:11px">★★★★★</span></td><td>4.6</td><td style="text-align:right"><span class="pr">¥1,200</span></td></tr>
+          </tbody></table>
+        </div>
+        <!-- VISA -->
+        <div class="card">
+          <div class="t-h" style="border-bottom:1px solid #E7E5E4"><div class="tl"><span class="ico">🛂</span><span class="tx">签证信息</span></div><span class="badge green">无需签证</span></div>
+          <div class="visa-grid">
+            <div class="v-item"><div class="v-lbl">状态</div><div class="v-val" style="color:#059669">🟢 免签（30天）</div></div>
+            <div class="v-item"><div class="v-lbl">停留</div><div class="v-val">最长 30 天</div></div>
+            <div class="v-item"><div class="v-lbl">费用</div><div class="v-val">免费</div></div>
+            <div class="v-item"><div class="v-lbl">要求</div><div class="v-val">护照 6 个月+</div></div>
+          </div>
+          <div class="visa-note">💡 2024 年起对中国公民永久免签</div>
+        </div>
+      </div>
+
+      <!-- FOOTER -->
+      <div style="height:40px;display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:11px;color:#A8A29E;border-top:1px solid #E7E5E4;padding-top:12px">
+        <span>TravelMind · DeepSeek + LangGraph 多智能体架构</span>
+        <span>🧠 总调度 → 🧭 目的地 → 📋 行程 → 💰 机酒 → 🛂 签证 → 🎒 清单 → 📍 本地 → 📝 汇总</span>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

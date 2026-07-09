@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TravelMind v2 设计 Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#F5F5F4;color:#1C1917;min-height:100vh}
+.serif{font-family:'Playfair Display',serif}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:#D6D3D1;border-radius:2px}
+
+/* Glass */
+.glass{background:rgba(255,255,255,0.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(231,229,228,0.6)}
+
+/* Hero gradient */
+.hero-grad{background:linear-gradient(135deg,#1E3A5F 0%,#1A365D 30%,#2D5A8E 60%,#4A8BC2 100%)}
+.hero-grad-light{background:linear-gradient(135deg,#1E3A5F 0%,#2C5282 50%,#3182CE 100%)}
+
+/* Cards */
+.card-soft{background:white;border-radius:16px;border:1px solid #E7E5E4;transition:all .25s ease}
+.card-soft:hover{box-shadow:0 12px 40px -12px rgba(28,25,23,0.12);transform:translateY(-2px)}
+
+/* Chat bubbles */
+.bubble-user{background:linear-gradient(135deg,#1E3A5F,#2D5A8E);color:white;border-radius:20px 20px 4px 20px}
+.bubble-ai{background:white;color:#1C1917;border:1px solid #E7E5E4;border-radius:20px 20px 20px 4px}
+
+/* Status dot */
+.s-dot{width:10px;height:10px;border-radius:50%;display:inline-block;position:relative}
+.s-dot.live{background:#22C55E}
+.s-dot.live::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid #22C55E;animation:ripple 2s infinite}
+@keyframes ripple{0%{transform:scale(1);opacity:1}100%{transform:scale(2);opacity:0}}
+
+/* Day number */
+.day-num{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:white;flex-shrink:0}
+
+/* Gem */
+.gem{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.gem-amber{background:#FEF3C7;color:#B45309}
+.gem-blue{background:#DBEAFE;color:#1E40AF}
+.gem-green{background:#D1FAE5;color:#065F46}
+.gem-rose{background:#FCE7F3;color:#9D174D}
+
+/* Price label */
+.price-label{font-size:22px;font-weight:800;background:linear-gradient(135deg,#1E3A5F,#4A8BC2);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+
+/* Tag chip */
+.chip{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #E7E5E4;background:white;transition:all .2s}
+.chip:hover{border-color:#1E3A5F;color:#1E3A5F}
+
+/* Input */
+.input-wrap{border-radius:16px;border:1.5px solid #E7E5E4;background:white;padding:4px;display:flex;align-items:center;transition:all .2s}
+.input-wrap:focus-within{border-color:#1E3A5F;box-shadow:0 0 0 4px rgba(30,58,95,0.08)}
+
+/* Tab line */
+.tab-l{position:relative;padding:10px 20px;font-size:13px;font-weight:500;color:#78716C;cursor:pointer;transition:all .2s;border:none;background:none}
+.tab-l.active{color:#1C1917;font-weight:600}
+.tab-l.active::after{content:'';position:absolute;bottom:0;left:16px;right:16px;height:2.5px;background:#1E3A5F;border-radius:2px}
+.tab-l:hover{color:#1C1917}
+
+/* Fade animation */
+@keyframes fIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.anim{animation:fIn .45s ease-out both}
+.d1{animation-delay:.05s}.d2{animation-delay:.1s}.d3{animation-delay:.15s}.d4{animation-delay:.2s}.d5{animation-delay:.25s}
+
+/* Agent float */
+.agent-float{position:fixed;bottom:32px;right:32px;z-index:100;background:white;border:1px solid #E7E5E4;border-radius:16px;padding:8px 16px 8px 12px;box-shadow:0 4px 24px rgba(0,0,0,0.06);display:flex;align-items:center;gap:10px;cursor:pointer;transition:all .3s ease;backdrop-filter:blur(8px)}
+.agent-float:hover{box-shadow:0 8px 32px rgba(0,0,0,0.1);transform:translateY(-2px)}
+.agent-float .dot{width:8px;height:8px;border-radius:50%;background:#22C55E;position:relative}
+.agent-float .dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid #22C55E;animation:ripple 2s infinite}
+
+/* Hover card image placeholder */
+.img-placeholder{background:linear-gradient(135deg,#FEE2E2,#FEF3C7,#DBEAFE);border-radius:12px}
+
+/* Dark mode override */
+@media(prefers-color-scheme:dark){
+  body{background:#0C0A09;color:#FAFAF9}
+  .glass{background:rgba(12,10,9,0.85);border-bottom:1px solid rgba(41,37,36,0.6)}
+  .card-soft{background:#1C1917;border-color:#292524}
+  .bubble-ai{background:#1C1917;border-color:#292524;color:#FAFAF9}
+  .input-wrap{background:#1C1917;border-color:#292524}
+  .chip{background:#1C1917;border-color:#292524;color:#D6D3D1}
+  .chip:hover{border-color:#4A8BC2;color:#4A8BC2}
+  .agent-float{background:#1C1917;border-color:#292524}
+  .tab-l{color:#A8A29E}
+  .tab-l.active{color:#FAFAF9}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="glass px-5 flex items-center justify-between" style="height:60px;position:sticky;top:0;z-index:50">
+  <div class="flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1E3A5F] to-[#4A8BC2] flex items-center justify-center text-white shadow-lg shadow-[#1E3A5F]/20" style="font-size:15px">🧳</div>
+    <span class="font-bold text-base tracking-tight">TravelMind</span>
+    <span class="hidden md:inline text-xs text-stone-400 ml-1">多智能体旅行管家</span>
+  </div>
+  <div class="flex items-center gap-2">
+    <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-stone-100 dark:bg-stone-800 text-xs text-stone-600 dark:text-stone-400">
+      <span class="s-dot live"></span>
+      <span>DeepSeek</span>
+    </div>
+    <button class="w-8 h-8 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center justify-center text-stone-400 transition-colors">☀</button>
+    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-[#1E3A5F] to-[#4A8BC2] flex items-center justify-center text-white text-xs font-semibold shadow-md">王</div>
+  </div>
+</nav>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+
+<!-- HERO TRIP SUMMARY -->
+<div class="hero-grad rounded-2xl p-[1px] shadow-xl shadow-[#1E3A5F]/10 anim d1">
+  <div class="rounded-[15px] bg-white dark:bg-[#1C1917] p-6 sm:p-8">
+    <div class="flex flex-col sm:flex-row items-start justify-between gap-4">
+      <div class="flex-1">
+        <div class="flex items-center gap-3 mb-2">
+          <span style="font-size:32px">🗾</span>
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold">东京 5 日旅行方案</h1>
+            <p class="text-sm text-stone-500 dark:text-stone-400 mt-0.5">3月15日 — 3月19日 · 东方航空 MU523 · 浅草微笑酒店</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-3">
+          <span class="gem gem-amber">🌸 樱花季</span>
+          <span class="gem gem-blue">🍜 美食之旅</span>
+          <span class="gem gem-rose">🛍 购物推荐</span>
+          <span class="gem gem-green">🎯 预算友好</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-4 sm:text-right">
+        <div class="hidden sm:block w-px h-12 bg-stone-200 dark:bg-stone-700"></div>
+        <div>
+          <div class="text-xs text-stone-400">预算参考</div>
+          <div class="price-label">¥8,500</div>
+          <div class="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">低于预算 ¥1,500</div>
+        </div>
+      </div>
+    </div>
+    <!-- Quick stats bar -->
+    <div class="flex flex-wrap gap-4 sm:gap-8 mt-5 pt-4 border-t border-stone-100 dark:border-stone-800">
+      <div><span class="text-lg">✈️</span><span class="text-xs text-stone-400 ml-1.5">东方航空</span><span class="text-sm font-semibold ml-1.5">MU523</span></div>
+      <div><span class="text-lg">🏨</span><span class="text-xs text-stone-400 ml-1.5">浅草微笑酒店</span><span class="text-sm font-semibold ml-1.5">¥400/晚</span></div>
+      <div><span class="text-lg">📅</span><span class="text-xs text-stone-400 ml-1.5">行程天数</span><span class="text-sm font-semibold ml-1.5">5 天</span></div>
+      <div><span class="text-lg">🛂</span><span class="text-xs text-stone-400 ml-1.5">签证</span><span class="text-sm font-semibold ml-1.5 text-emerald-600 dark:text-emerald-400">免签 ✓</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN GRID: Chat + Results -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-5">
+
+  <!-- LEFT: CHAT -->
+  <div class="lg:col-span-4 card-soft overflow-hidden flex flex-col anim d2" style="max-height:600px">
+    <!-- Chat header -->
+    <div class="flex items-center gap-2.5 px-5 py-3.5 border-b border-stone-100 dark:border-stone-800">
+      <div class="w-8 h-8 rounded-lg bg-[#1E3A5F]/10 dark:bg-[#4A8BC2]/20 flex items-center justify-center text-[#1E3A5F] dark:text-[#4A8BC2]"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-semibold">旅行对话</div>
+        <div class="flex items-center gap-1.5 mt-0.5">
+          <span class="s-dot live" style="width:6px;height:6px"></span>
+          <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">8 个智能体协作中</span>
+        </div>
+      </div>
+      <button class="w-7 h-7 rounded-md hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center justify-center text-stone-400 transition-colors"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div>
+    <!-- Messages -->
+    <div class="flex-1 overflow-y-auto p-4 space-y-3.5">
+      <div class="flex items-start gap-2.5">
+        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-[#1E3A5F] to-[#4A8BC2] flex items-center justify-center text-white text-[10px] flex-shrink-0 mt-0.5 shadow-md">🧳</div>
+        <div class="bubble-ai px-4 py-3 max-w-[88%]">
+          <p class="text-sm leading-relaxed">你好！我是 TravelMind，你的 AI 旅行管家 🧳</p>
+          <p class="text-sm leading-relaxed mt-1 text-stone-500 dark:text-stone-400">告诉我你想去哪里，我为你规划完美旅程 ✨</p>
+        </div>
+      </div>
+      <div class="flex items-start gap-2.5 justify-end">
+        <div class="bubble-user px-4 py-3 max-w-[88%]">
+          <p class="text-sm leading-relaxed">我想去日本东京玩5天，预算1万左右，喜欢美食和购物</p>
+        </div>
+        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-amber-600 to-orange-500 flex items-center justify-center text-white text-[10px] flex-shrink-0 mt-0.5 shadow-md">王</div>
+      </div>
+      <div class="flex items-start gap-2.5">
+        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-[#1E3A5F] to-[#4A8BC2] flex items-center justify-center text-white text-[10px] flex-shrink-0 mt-0.5 shadow-md">🧳</div>
+        <div class="bubble-ai px-4 py-3 max-w-[88%]">
+          <div class="flex items-center gap-2 text-xs text-stone-400 mb-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>旅行方案已生成</span></div>
+          <p class="text-sm leading-relaxed">好的！已为你规划了 <strong>东京 5 天</strong> 的完整行程，在右侧可以查看每日安排、费用明细等详情。</p>
+        </div>
+      </div>
+    </div>
+    <!-- Suggestions -->
+    <div class="px-4 py-2 flex gap-1.5 flex-wrap border-t border-stone-100 dark:border-stone-800">
+      <button class="chip text-[11px]">🇯🇵 东京5天</button>
+      <button class="chip text-[11px]">🇹🇭 曼谷美食</button>
+      <button class="chip text-[11px]">🇫🇷 巴黎蜜月</button>
+      <button class="chip text-[11px]">🇸🇬 新加坡4天</button>
+    </div>
+    <!-- Input -->
+    <div class="px-4 pb-4 pt-2">
+      <div class="input-wrap">
+        <input type="text" placeholder="输入旅行需求..." class="flex-1 bg-transparent border-0 outline-none text-sm px-3 placeholder:text-stone-400 dark:text-stone-300" value="想去日本东京玩5天">
+        <button class="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1E3A5F] to-[#4A8BC2] text-white flex items-center justify-center transition-all hover:scale-105 active:scale-95 flex-shrink-0 shadow-md"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2z"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: RESULTS -->
+  <div class="lg:col-span-8 space-y-4 anim d3">
+
+    <!-- Tabs -->
+    <div class="card-soft px-1 py-1 flex items-center">
+      <button class="tab-l active">📋 行程总览</button>
+      <button class="tab-l">💰 费用明细</button>
+      <button class="tab-l">🎒 行李清单</button>
+      <button class="tab-l">📍 实用信息</button>
+    </div>
+
+    <!-- DAY CARDS -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+      <!-- Day 1 -->
+      <div class="card-soft overflow-hidden anim d3">
+        <div class="px-4 py-3 flex items-center gap-3 border-b border-stone-100 dark:border-stone-800">
+          <div class="day-num bg-gradient-to-br from-[#1E3A5F] to-[#4A8BC2]">1</div>
+          <div><div class="text-sm font-semibold">抵达 · 初探东京</div><div class="text-[11px] text-stone-400">3月15日</div></div>
+        </div>
+        <div class="p-4 space-y-3">
+          <div class="flex items-start gap-3"><span class="text-[11px] font-semibold text-[#4A8BC2] w-12 flex-shrink-0 pt-0.5">☀ 上午</span><div><p class="text-sm font-medium">抵达成田机场</p><p class="text-xs text-stone-400 mt-0.5">乘坐机场快线前往市区</p></div></div>
+          <div class="flex items-start gap-3"><span class="text-[11px] font-semibold text-amber-600 w-12 flex-shrink-0 pt-0.5">🌤 下午</span><div><p class="text-sm font-medium">浅草寺 · 仲见世通</p><p class="text-xs text-stone-400 mt-0.5">感受江户风情，品尝人形烧</p></div></div>
+          <div class="flex items-start gap-3"><span class="text-[11px] font-semibold text-indigo-500 w-12 flex-shrink-0 pt-0.5">🌙 晚上</span><div><p class="text-sm font-medium">晴空塔夜景</p><p class="text-xs text-stone-400 mt-0.5">俯瞰东京全景，晚餐在塔内餐厅</p></div></div>
+        </div>
+      </div>
+      <!-- Day 2 -->
+      <div class="card-soft overflow-hidden anim d4">
+        <div class="px-4 py-3 flex items-center gap-3 border-b border-stone-100 dark:border-stone-800">
+          <div class="day-num bg-gradient-to-br from-stone-500 to-stone-400">2</div>
+          <div><div class="text-sm font-semibold">经典 · 新宿涩谷</div><div class="text-[11px] text-stone-400">3月16日</div></div>
+        </div>
+        <div class="p-4 space-y-3">
+          <div class="flex items-start gap-3"><span class="text-[11px] font-semibold text-[#4A8BC2] w-12 flex-shrink-0 pt-0.5">☀ 上午</span><div><p class="text-sm font-medium">明治神宫</p><p class="text-xs text-stone-400 mt-0.5">东京最大神社，漫步森林</p></div></div>
+          <div class="flex items-start gap-3"><span class="text-[11px] font-semibold text-amber-600 w-12 flex-shrink-0 pt-0.5">🌤 下午</span><div><p class="text-sm font-medium">涩谷 · 原宿</p><p class="text-xs text-stone-400 mt-0.5">涩谷十字路口 & 竹下通购物</p></div></div>
+          <div class="flex items-start gap-3"><span class="text-[11px] font-semibold text-indigo-500 w-12 flex-shrink-0 pt-0.5">🌙 晚上</span><div><p class="text-sm font-medium">新宿居酒屋</p><p class="text-xs text-stone-400 mt-0.5">体验地道日式居酒屋文化</p></div></div>
+        </div>
+      </div>
+      <!-- Day 3 -->
+      <div class="card-soft overflow-hidden anim d5">
+        <div class="px-4 py-3 flex items-center gap-3 border-b border-stone-100 dark:border-stone-800">
+          <div class="day-num bg-gradient-to-br from-stone-500 to-stone-400">3</div>
+          <div><div class="text-sm font-semibold">文化 · 秋叶原银座</div><div class="text-[11px] text-stone-400">3月17日</div></div>
+        </div>
+        <div class="p-4 space-y-3">
+          <div class="flex items-start gap-3"><span class="text-[11px] font-semibold text-[#4A8BC2] w-12 flex-shrink-0 pt-0.5">☀ 上午</span><div><p class="text-sm font-medium">秋叶原电器街</p><p class="text-xs text-stone-400 mt-0.5">动漫、电器、女仆咖啡厅</p></div></div>
+          <div class="flex items-start gap-3"><span class="text-[11px] font-semibold text-amber-600 w-12 flex-shrink-0 pt-0.5">🌤 下午</span><div><p class="text-sm font-medium">银座高端购物</p><p class="text-xs text-stone-400 mt-0.5">三越百货、Ginza Six</p></div></div>
+          <div class="flex items-start gap-3"><span class="text-[11px] font-semibold text-indigo-500 w-12 flex-shrink-0 pt-0.5">🌙 晚上</span><div><p class="text-sm font-medium">东京塔夜景</p><p class="text-xs text-stone-400 mt-0.5">六本木展望台</p></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTTOM GRID: Flight + Hotel | Packing + Visa -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+      <!-- LEFT COL -->
+      <div class="space-y-4">
+        <div class="card-soft p-5 anim d3">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2"><span class="text-lg">✈️</span><h3 class="text-sm font-semibold">航班推荐</h3></div>
+            <span class="gem gem-green text-[10px]">最低 ¥2,500</span>
+          </div>
+          <table class="w-full text-xs">
+            <thead><tr class="text-stone-400 border-b border-stone-100 dark:border-stone-800"><th class="text-left font-medium pb-2.5">航班</th><th class="text-left font-medium pb-2.5">时间</th><th class="text-right font-medium pb-2.5">价格</th></tr></thead>
+            <tbody>
+              <tr class="border-b border-stone-100/50 dark:border-stone-800/50"><td class="py-2.5"><span class="font-medium">东方航空 MU523</span><span class="text-stone-400 ml-1.5">⭐推荐</span></td><td class="py-2.5 text-stone-500">14:20–18:35</td><td class="py-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">¥2,500</td></tr>
+              <tr class="border-b border-stone-100/50 dark:border-stone-800/50"><td class="py-2.5"><span class="font-medium">国航 CA925</span></td><td class="py-2.5 text-stone-500">08:30–12:50</td><td class="py-2.5 text-right font-semibold">¥2,800</td></tr>
+              <tr><td class="py-2.5"><span class="font-medium">全日空 NH920</span></td><td class="py-2.5 text-stone-500">09:00–13:10</td><td class="py-2.5 text-right font-semibold">¥3,200</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card-soft p-5 anim d4">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2"><span class="text-lg">🏨</span><h3 class="text-sm font-semibold">酒店推荐</h3></div>
+            <span class="gem gem-green text-[10px]">¥400/晚起</span>
+          </div>
+          <table class="w-full text-xs">
+            <thead><tr class="text-stone-400 border-b border-stone-100 dark:border-stone-800"><th class="text-left font-medium pb-2.5">酒店</th><th class="text-left font-medium pb-2.5">评分</th><th class="text-right font-medium pb-2.5">价格/晚</th></tr></thead>
+            <tbody>
+              <tr class="border-b border-stone-100/50 dark:border-stone-800/50"><td class="py-2.5"><span class="font-medium">浅草微笑酒店</span><span class="text-stone-400 ml-1">★★★</span></td><td class="py-2.5 text-stone-500">4.0</td><td class="py-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">¥400</td></tr>
+              <tr class="border-b border-stone-100/50 dark:border-stone-800/50"><td class="py-2.5"><span class="font-medium">新宿华盛顿酒店</span><span class="text-stone-400 ml-1">★★★</span></td><td class="py-2.5 text-stone-500">4.2</td><td class="py-2.5 text-right font-semibold">¥600</td></tr>
+              <tr><td class="py-2.5"><span class="font-medium">东京湾希尔顿</span><span class="text-stone-400 ml-1">★★★★★</span></td><td class="py-2.5 text-stone-500">4.6</td><td class="py-2.5 text-right font-semibold">¥1,200</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- RIGHT COL -->
+      <div class="space-y-4">
+        <div class="card-soft p-5 anim d4">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2"><span class="text-lg">🎒</span><h3 class="text-sm font-semibold">行李清单</h3></div>
+            <span class="gem gem-amber text-[10px]">建议携带</span>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <p class="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">📄 必备证件</p>
+              <div class="flex items-center gap-2 text-xs"><span class="w-4 h-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">✓</span>护照/签证</div>
+              <div class="flex items-center gap-2 text-xs"><span class="w-4 h-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">✓</span>机票行程单</div>
+              <div class="flex items-center gap-2 text-xs"><span class="w-4 h-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">✓</span>日元现金</div>
+              <div class="flex items-center gap-2 text-xs"><span class="w-4 h-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">✓</span>信用卡/Visa</div>
+            </div>
+            <div class="space-y-2">
+              <p class="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">👔 穿搭建议</p>
+              <div class="flex items-center gap-2 text-xs"><span class="w-4 h-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">✓</span>舒适步行鞋</div>
+              <div class="flex items-center gap-2 text-xs"><span class="w-4 h-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">✓</span>防晒帽/墨镜</div>
+              <div class="flex items-center gap-2 text-xs"><span class="w-4 h-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">✓</span>轻薄外套</div>
+              <div class="flex items-center gap-2 text-xs"><span class="w-4 h-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-[10px] font-bold">✓</span>转换插头</div>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-stone-100 dark:border-stone-800"><div class="flex items-center gap-2 text-xs text-stone-500"><span>🌤</span><span>东京 3 月气温 8–13°C，建议穿薄外套 + 长袖，方便叠穿</span></div></div>
+        </div>
+        <div class="card-soft p-5 anim d5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2"><span class="text-lg">🛂</span><h3 class="text-sm font-semibold">签证信息</h3></div>
+            <span class="gem gem-green text-[10px]">无需签证</span>
+          </div>
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div><span class="text-stone-400 block mb-1">状态</span><span class="font-medium text-emerald-600 dark:text-emerald-400">🟢 免签（30天）</span></div>
+            <div><span class="text-stone-400 block mb-1">停留</span><span>单次最长 30 天</span></div>
+            <div><span class="text-stone-400 block mb-1">费用</span><span>免费</span></div>
+            <div><span class="text-stone-400 block mb-1">要求</span><span>护照（6个月+）</span></div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-stone-100 dark:border-stone-800 text-xs text-stone-500">💡 2024 年起对中国公民永久免签</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="flex items-center justify-between mt-8 pt-4 border-t border-stone-200 dark:border-stone-800">
+  <div class="text-xs text-stone-400">TravelMind · 基于 DeepSeek + LangGraph 多智能体架构</div>
+  <div class="text-xs text-stone-400">🧳 8 个 Agent 协同</div>
+</div>
+
+</div><!-- /max-w-7xl -->
+
+<!-- FLOATING AGENT STATUS -->
+<div class="agent-float" onclick="this.classList.toggle('active')">
+  <span class="dot"></span>
+  <span class="text-xs font-medium">8 Agents 活跃</span>
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A8A29E" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+</div>
+
+</body>
+</html>

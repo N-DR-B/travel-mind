@@ -1,0 +1,11 @@
+﻿# TravelMind .gitignore
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.venv/
+venv/
+*.db
+.DS_Store
+Thumbs.db
+*.log
