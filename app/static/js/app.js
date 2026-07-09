@@ -1,416 +1,197 @@
-﻿/* ===== TravelMind Frontend App ===== */
-
-let currentSessionId = null;
-let eventSource = null;
-let agentResults = {};
-let isProcessing = false;
-
-// === Theme ===
-function initTheme() {
-    const saved = localStorage.getItem("tm-theme") || "light";
-    if (saved === "dark") document.documentElement.classList.add("dark");
-    updateThemeIcon(saved);
-}
-
-function toggleTheme() {
-    const isDark = document.documentElement.classList.toggle("dark");
-    const theme = isDark ? "dark" : "light";
-    localStorage.setItem("tm-theme", theme);
-    updateThemeIcon(theme);
-}
-
-function updateThemeIcon(theme) {
-    const btn = document.getElementById("themeBtn");
-    if (btn) btn.innerHTML = theme === "dark" ? '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>' : '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
-}
-
-// === Chat ===
+﻿// TravelMind App v3
+var currentSessionId = null, eventSource = null, agentResults = {}, isProcessing = false;
+var agentStatus = {};
+var AGENT_NAMES = ["orchestrator","destination","itinerary","booking","visa","packing","local","summarizer"];
 function addMessage(role, content) {
-    const container = document.getElementById("chatMessages");
-    const div = document.createElement("div");
-    div.className = `msg msg-${role}`;
-
-    if (role === "assistant" && typeof content === "object") {
-        div.textContent = JSON.stringify(content, null, 2);
-    } else {
-        div.textContent = content;
-    }
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
+  var c = document.getElementById("chatMessages"), d = document.createElement("div");
+  if (role === "user") {
+    d.className = "msg o";
+    d.innerHTML = '<div class="bb us">' + content + '</div><div class="av" style="background:linear-gradient(135deg,#D97706,#EA580C);color:white">王</div>';
+  } else {
+    d.className = "msg";
+    d.innerHTML = '<div class="av" style="background:linear-gradient(135deg,#1E3A5F,#4A8BC2);color:white">🧳</div><div class="bb ai">' + content + '</div>';
+  }
+  c.appendChild(d); c.scrollTop = c.scrollHeight;
 }
-
 function showTyping() {
-    const container = document.getElementById("chatMessages");
-    const div = document.createElement("div");
-    div.className = "msg msg-typing";
-    div.id = "typingIndicator";
-    div.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
+  if (document.getElementById("typingEl")) return;
+  var d = document.createElement("div"); d.className = "msg"; d.id = "typingEl";
+  d.innerHTML = '<div class="av" style="background:linear-gradient(135deg,#1E3A5F,#4A8BC2);color:white">🧳</div><div class="bb ai"><span class="ld"></span>正在处理你的需求...</div>';
+  document.getElementById("chatMessages").appendChild(d);
+  document.getElementById("chatMessages").scrollTop = document.getElementById("chatMessages").scrollHeight;
 }
-
-function hideTyping() {
-    const el = document.getElementById("typingIndicator");
-    if (el) el.remove();
+function hideTyping() { var e = document.getElementById("typingEl"); if (e) e.remove(); }
+function updateAgentStatus(name, status) {
+  agentStatus[name] = status;
+  var done = 0, run = 0;
+  for (var i = 0; i < AGENT_NAMES.length; i++) {
+    var n = AGENT_NAMES[i];
+    if (agentStatus[n] === "completed" || agentStatus[n] === "done") done++;
+    if (agentStatus[n] === "running") run++;
+  }
+  var badge = document.getElementById("agentBadge");
+  if (!badge) return;
+  if (run > 0) badge.innerHTML = '<span class="nm">' + done + "/" + AGENT_NAMES.length + '</span> 运行中...';
+  else badge.innerHTML = '<span class="nm">' + AGENT_NAMES.length + '</span> Agents <span style="margin-left:4px;font-size:10px;color:var(--stone-400)">🧠→📋→📝</span>';
 }
-
-// === Agent Workflow ===
-function initWorkflow() {
-    ["orchestrator","destination","itinerary","booking","visa","packing","local","summarizer"].forEach(name => {
-        const card = document.getElementById(`agent-${name}`);
-        if (card) {
-            card.className = "agent-card status-pending";
-        }
-    });
+function startStream(sid) {
+  if (eventSource) eventSource.close();
+  currentSessionId = sid; agentStatus = {};
+  for (var i = 0; i < AGENT_NAMES.length; i++) agentStatus[AGENT_NAMES[i]] = "pending";
+  eventSource = new EventSource("/api/travel/stream/" + sid);
+  eventSource.onmessage = function(e) { try { handleEvent(JSON.parse(e.data)); } catch(err) {} };
+  eventSource.onerror = function() { eventSource.close(); hideTyping(); isProcessing = false; updateSendBtn(); };
 }
-
-function updateAgentStatus(agentName, status, message) {
-    const card = document.getElementById(`agent-${agentName}`);
-    if (!card) return;
-    card.className = `agent-card status-${status}`;
-    const textEl = card.querySelector(".agent-status-text");
-    if (textEl) {
-        const msgs = {
-            pending: "等待执行",
-            running: "正在处理...",
-            completed: "已完成",
-            error: "处理出错"
-        };
-        textEl.textContent = message || msgs[status] || status;
-    }
-    const badge = card.querySelector(".agent-status-badge");
-    if (badge) {
-        const labels = { pending: "等待", running: "执行中", completed: "✓ 完成", error: "✗ 错误" };
-        badge.textContent = labels[status] || status;
-    }
-}
-
-// === SSE Events ===
-function startStream(sessionId) {
-    if (eventSource) eventSource.close();
-    currentSessionId = sessionId;
-
-    // Load agents and show workflow
-    initWorkflow();
-
-    eventSource = new EventSource(`/api/travel/stream/${sessionId}`);
-
-    eventSource.onmessage = function(e) {
-        try {
-            const data = JSON.parse(e.data);
-            handleEvent(data);
-        } catch (err) {
-            console.log("SSE raw:", e.data);
-        }
-    };
-
-    eventSource.onerror = function() {
-        console.log("SSE connection closed");
-        eventSource.close();
-        hideTyping();
-        isProcessing = false;
-        updateSendBtn();
-    };
-}
-
 function handleEvent(data) {
-    const { event, data: payload } = data;
-
-    switch (event) {
-        case "agent_start":
-            updateAgentStatus(payload.agent_name, "running");
-            showTyping();
-            break;
-
-        case "agent_complete":
-            updateAgentStatus(payload.agent_name, "completed");
-            agentResults[payload.agent_name] = payload.result;
-            hideTyping();
-            break;
-
-        case "agent_error":
-            updateAgentStatus(payload.agent_name, "error", payload.error);
-            hideTyping();
-            break;
-
-        case "workflow_complete":
-            hideTyping();
-            isProcessing = false;
-            updateSendBtn();
-            if (payload && payload.outputs) {
-                agentResults = payload.outputs;
-                renderReport(payload.outputs);
-                addMessage("assistant", "旅行方案已生成，您可以在右侧查看详情！");
-            }
-            break;
-
-        case "workflow_error":
-            hideTyping();
-            isProcessing = false;
-            updateSendBtn();
-            addMessage("assistant", "抱歉，生成方案时出现错误，请重试。");
-            break;
-
-        case "done":
-            eventSource.close();
-            isProcessing = false;
-            updateSendBtn();
-            break;
-    }
+  var ev = data.event, p = data.data || {};
+  switch(ev) {
+    case "agent_start": updateAgentStatus(p.agent_name, "running"); showTyping(); break;
+    case "agent_complete": updateAgentStatus(p.agent_name, "completed"); agentResults[p.agent_name] = p.result; hideTyping(); break;
+    case "agent_error": updateAgentStatus(p.agent_name, "error"); hideTyping(); break;
+    case "workflow_complete": hideTyping(); isProcessing = false; updateSendBtn();
+      if (p && p.outputs) { agentResults = p.outputs; renderReport(p.outputs); addMessage("assistant", "旅行方案已生成，在右侧可以查看每日安排、费用明细等详情。"); } break;
+    case "workflow_error": hideTyping(); isProcessing = false; updateSendBtn(); addMessage("assistant", "抱歉，生成方案时出现错误，请重试。"); break;
+    case "done": eventSource.close(); isProcessing = false; updateSendBtn(); break;
+  }
 }
-
-// === Send Message ===
-async function sendMessage() {
-    if (isProcessing) return;
-    const input = document.getElementById("chatInput");
-    const text = input.value.trim();
-    if (!text) return;
-
-    isProcessing = true;
-    updateSendBtn();
-
-    addMessage("user", text);
-    input.value = "";
-    input.style.height = "auto";
-
-    initWorkflow();
-    showTyping();
-
-    try {
-        const resp = await fetch("/api/travel", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: text })
-        });
-        const data = await resp.json();
-        startStream(data.session_id);
-    } catch (err) {
-        hideTyping();
-        isProcessing = false;
-        updateSendBtn();
-        addMessage("assistant", "网络错误，请检查连接后重试。");
-    }
-}
-
 function updateSendBtn() {
-    const btn = document.getElementById("sendBtn");
-    if (btn) {
-        btn.disabled = isProcessing;
-        btn.innerHTML = isProcessing ? '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>' : '发送 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2z"/></svg>';
-    }
+  var btn = document.getElementById("sendBtn");
+  if (!btn) return;
+  btn.disabled = isProcessing;
+  if (isProcessing) {
+    btn.innerHTML = '<div style="display:flex;gap:2px;align-items:center;justify-content:center;height:100%"><div style="width:4px;height:4px;border-radius:50%;background:white;animation:bounce 1.4s infinite"></div><div style="width:4px;height:4px;border-radius:50%;background:white;animation:bounce 1.4s .2s infinite"></div><div style="width:4px;height:4px;border-radius:50%;background:white;animation:bounce 1.4s .4s infinite"></div></div>';
+  } else {
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2z"/></svg>';
+  }
 }
-
-// === Report Rendering ===
-let currentTab = "overview";
-
+async function sendMessage() {
+  if (isProcessing) return;
+  var text = document.getElementById("chatInput").value.trim();
+  if (!text) return;
+  isProcessing = true; updateSendBtn();
+  addMessage("user", document.getElementById("chatInput").value);
+  document.getElementById("chatInput").value = "";
+  var wc = document.getElementById("welcomeScreen");
+  if (wc) wc.style.display = "none";
+  showTyping();
+  try {
+    var r = await fetch("/api/travel", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({message: text}) });
+    var d = await r.json();
+    startStream(d.session_id);
+  } catch(e) {
+    hideTyping(); isProcessing = false; updateSendBtn();
+    addMessage("assistant", "网络错误，请检查连接后重试。");
+  }
+}
+function useExample(text) { document.getElementById("chatInput").value = text; sendMessage(); }
+var currentTab = "overview";
 function renderReport(outputs) {
-    const container = document.getElementById("resultsContainer");
-    const welcome = document.getElementById("welcomeScreen");
-    if (welcome) welcome.style.display = "none";
-
-    container.innerHTML = `
-        <div class="report-container">
-            ${renderTabs()}
-            <div id="reportContent" class="report-content">
-                ${renderOverviewTab(outputs)}
-            </div>
-        </div>
-    `;
+  document.getElementById("resultsContainer").innerHTML = '<div class="report-container">' + renderHero(outputs) + renderTabs() + '<div id="reportContent" class="report-content">' + renderOverviewTab(outputs) + '</div></div>';
 }
-
+function renderHero(o) {
+  var dest = o.destination || {}, itin = o.itinerary || {}, b = o.booking || {};
+  var dName = dest.destination || itin.destination || "目的地", days = itin.days || 5;
+  var bMin = "", bSav = "";
+  if (b.budget_estimate) { bMin = b.budget_estimate.flight_min + b.budget_estimate.hotel_min * days; bSav = "预算参考"; }
+  return '<div class="hero"><div class="hm"><div class="ic">🗾</div><div class="in"><h1>' + dName + " " + days + ' 日旅行方案</h1><div class="tg"><span>🌸 最佳季节</span><span>🍜 地道美食</span><span>🎯 智能规划</span></div></div></div><div class="hd"><div class="lb">预算参考</div><div class="am">¥' + (bMin || "待估算") + '</div>' + (bSav ? '<div class="sv">' + bSav + "</div>" : "") + '</div></div>';
+}
 function renderTabs() {
-    return `
-        <div class="report-tabs">
-            <button class="report-tab active" onclick="switchTab('overview')">📋 行程总览</button>
-            <button class="report-tab" onclick="switchTab('cost')">💰 费用明细</button>
-            <button class="report-tab" onclick="switchTab('packing')">🎒 行李清单</button>
-            <button class="report-tab" onclick="switchTab('info')">📍 实用信息</button>
-        </div>
-    `;
+  return '<div class="tr"><button class="act" onclick="switchTab(\'overview\')">📋 行程总览</button><button onclick="switchTab(\'cost\')">💰 费用明细</button><button onclick="switchTab(\'packing\')">🎒 行李清单</button><button onclick="switchTab(\'info\')">📍 实用信息</button></div>';
 }
-
 function switchTab(tab) {
-    currentTab = tab;
-    document.querySelectorAll(".report-tab").forEach(el => el.classList.remove("active"));
-    document.querySelectorAll(".report-tab")[["overview","cost","packing","info"].indexOf(tab)].classList.add("active");
-    const content = document.getElementById("reportContent");
-    content.innerHTML = tab === "overview" ? renderOverviewTab(agentResults) :
-                        tab === "cost" ? renderCostTab(agentResults) :
-                        tab === "packing" ? renderPackingTab(agentResults) :
-                        renderInfoTab(agentResults);
+  currentTab = tab;
+  var btns = document.querySelectorAll(".tr button");
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove("act");
+  var idx = ["overview","cost","packing","info"].indexOf(tab);
+  if (btns[idx]) btns[idx].classList.add("act");
+  var el = document.getElementById("reportContent");
+  if (tab === "overview") el.innerHTML = renderOverviewTab(agentResults);
+  else if (tab === "cost") el.innerHTML = renderCostTab(agentResults);
+  else if (tab === "packing") el.innerHTML = renderPackingTab(agentResults);
+  else el.innerHTML = renderInfoTab(agentResults);
 }
-
+function renderFlightTable(b) {
+  var flights = b.flights || [];
+  if (flights.length === 0) return '<div class="card tw"><div class="th"><div class="tl"><span class="ico">✈️</span><span class="tx">航班推荐</span></div></div><div style="padding:20px;text-align:center;color:var(--stone-400);font-size:13px">暂无数据</div></div>';
+  var minP = Math.min.apply(null, flights.map(function(f) { return f.price; }));
+  var rows = "";
+  for (var i = 0; i < flights.length; i++) {
+    var f = flights[i];
+    rows += '<tr><td>' + f.airline + " " + f.flight;
+    if (f.price === minP) rows += ' <span class="rc"><span class="st">★</span> 推荐</span>';
+    rows += '</td><td>' + (f.departure || "") + "–" + (f.arrival || "") + '</td><td style="text-align:right"><span class="pr' + (f.price === minP ? " gn" : "") + '">¥' + f.price + '</span></td></tr>';
+  }
+  return '<div class="card tw"><div class="th"><div class="tl"><span class="ico">✈️</span><span class="tx">航班推荐</span></div><span class="bg gn">最低 ¥' + minP + '</span></div><table><thead><tr><th>航班</th><th>时间</th><th style="text-align:right">价格</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+function renderHotelTable(b) {
+  var hotels = b.hotels || [];
+  if (hotels.length === 0) return '<div class="card tw"><div class="th"><div class="tl"><span class="ico">🏨</span><span class="tx">酒店推荐</span></div></div><div style="padding:20px;text-align:center;color:var(--stone-400);font-size:13px">暂无数据</div></div>';
+  var minP = Math.min.apply(null, hotels.map(function(h) { return h.price_per_night; }));
+  var rows = "";
+  for (var i = 0; i < hotels.length; i++) {
+    var h = hotels[i]; var stars = "";
+    for (var s = 0; s < (h.stars || 3); s++) stars += "★";
+    var isMin = h.price_per_night === minP;
+    rows += '<tr><td>' + h.name + ' <span style="color:var(--stone-400);font-size:11px">' + stars + '</span></td><td>' + h.rating + '</td><td style="text-align:right"><span class="pr' + (isMin ? " gn" : "") + '">¥' + h.price_per_night + '</span></td></tr>';
+  }
+  return '<div class="card tw"><div class="th"><div class="tl"><span class="ico">🏨</span><span class="tx">酒店推荐</span></div><span class="bg gn">¥' + minP + '/晚起</span></div><table><thead><tr><th>酒店</th><th>评分</th><th style="text-align:right">价格/晚</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
 function renderOverviewTab(o) {
-    const dest = o.destination || {};
-    const itin = o.itinerary || {};
-    const visa = o.visa || {};
-    const days = itin.days || 5;
-    const destName = dest.destination || itin.destination || "目的地";
-    const itineraryList = itin.itinerary || [];
-
-    return `
-        <div class="report-card">
-            <div class="report-card-title">
-                ✈️ ${destName} ${days}日旅行方案
-                <span class="badge badge-primary">完整方案</span>
-            </div>
-            <div class="report-section">
-                <p style="color: var(--text-secondary); line-height: 1.6;">${dest.description || ""}</p>
-            </div>
-            ${dest.best_season ? `
-            <div class="report-section">
-                <h4>最佳旅行季节</h4>
-                <p style="font-size:0.9rem;">${dest.best_season}</p>
-            </div>` : ""}
-            ${dest.cuisine ? `
-            <div class="report-section">
-                <h4>🍜 推荐美食</h4>
-                <div class="tag-list">${dest.cuisine.map(c => `<span class="tag">${c}</span>`).join("")}</div>
-            </div>` : ""}
-        </div>
-
-        <div class="report-card">
-            <div class="report-card-title">📋 每日行程</div>
-            <div class="daily-itinerary">
-                ${itineraryList.length > 0 ? itineraryList.map(d => `
-                    <div class="day-card">
-                        <div class="day-header">📅 第 ${d.day} 天 · ${d.title || ""}</div>
-                        <div class="day-body">
-                            ${(d.activities || []).map(a => `
-                                <div class="activity-item">
-                                    <span class="activity-time">${a.time || ""}</span>
-                                    <span class="activity-desc"><strong>${a.activity || ""}</strong>${a.description ? " — " + a.description : ""}</span>
-                                </div>
-                            `).join("")}
-                        </div>
-                    </div>
-                `).join("") : '<p style="color:var(--text-muted)">行程数据加载中...</p>'}
-            </div>
-        </div>
-
-        ${visa.status ? `
-        <div class="report-card">
-            <div class="report-card-title">🛂 签证信息</div>
-            <div class="report-section">
-                <p><strong>状态:</strong> ${visa.status}${visa.visa_type ? " · " + visa.visa_type : ""}</p>
-                ${visa.processing_days ? `<p><strong>办理时间:</strong> ${visa.processing_days}</p>` : ""}
-                ${visa.fee ? `<p><strong>费用:</strong> ${visa.fee}</p>` : ""}
-                ${visa.notes ? `<p style="margin-top:8px;color:var(--text-secondary);font-size:0.85rem;">💡 ${visa.notes}</p>` : ""}
-            </div>
-        </div>` : ""}
-    `;
+  var itin = o.itinerary || {}, days = itin.itinerary || [], html = '<div class="g3">';
+  for (var i = 0; i < days.length; i++) {
+    var d = days[i];
+    html += '<div class="card"><div class="ch"><div class="no ' + (d.day === 1 ? "bl" : "gr") + '">' + d.day + '</div><div class="ti"><div class="tt">' + (d.title || "第" + d.day + "天") + '</div></div></div><div class="cb">';
+    var acts = d.activities || [];
+    for (var j = 0; j < acts.length; j++) {
+      var a = acts[j], cls = "mo";
+      if (a.time && a.time.indexOf("下午") > -1) cls = "af";
+      if (a.time && a.time.indexOf("晚上") > -1) cls = "ev";
+      html += '<div class="ac"><span class="tm ' + cls + '">' + (a.time || "") + '</span><div class="d"><p>' + (a.activity || "") + '</p><div class="s">' + (a.description || "") + '</div></div></div>';
+    }
+    html += '</div></div>';
+  }
+  html += '</div><div class="g2">';
+  html += renderFlightTable(o.booking || {});
+  html += renderPackingCard(o.packing || {});
+  html += renderHotelTable(o.booking || {});
+  html += renderVisaCard(o.visa || {});
+  html += '</div>';
+  return html;
 }
-
-function renderCostTab(o) {
-    const booking = o.booking || {};
-    const dest = o.destination || {};
-    const flights = booking.flights || [];
-    const hotels = booking.hotels || [];
-
-    return `
-        <div class="report-card">
-            <div class="report-card-title">✈️ 航班推荐 <span class="badge badge-success">比价结果</span></div>
-            ${flights.length > 0 ? `
-            <table class="flight-table">
-                <tr><th>航空公司</th><th>航班号</th><th>时间</th><th>价格</th></tr>
-                ${flights.map(f => `<tr><td>${f.airline}</td><td>${f.flight}</td><td>${f.departure}-${f.arrival}</td><td class="price-highlight">¥${f.price}</td></tr>`).join("")}
-            </table>` : '<p style="color:var(--text-muted)">暂无航班数据</p>'}
-        </div>
-        <div class="report-card">
-            <div class="report-card-title">🏨 酒店推荐</div>
-            ${hotels.length > 0 ? `
-            <table class="hotel-table">
-                <tr><th>酒店</th><th>评分</th><th>位置</th><th>价格/晚</th></tr>
-                ${hotels.map(h => `<tr><td>${h.name}${"★".repeat(h.stars||3)}</td><td>${h.rating}</td><td>${h.location}</td><td class="price-highlight">¥${h.price_per_night}</td></tr>`).join("")}
-            </table>` : '<p style="color:var(--text-muted)">暂无酒店数据</p>'}
-        </div>
-    `;
+function renderPackingCard(p) {
+  var items1 = (p.essentials || []).slice(0,4);
+  var items2 = (p.clothing || []).concat(p.electronics || []).slice(0,4);
+  var tip = p.weather_tip || "建议根据目的地天气准备合适衣物";
+  function mk(arr) { var h = ""; for (var i = 0; i < arr.length; i++) h += '<div class="it"><span class="ck">✓</span>' + arr[i] + '</div>'; return h; }
+  return '<div class="card"><div class="tc"><div class="thdr"><div class="tl"><span class="ico">🎒</span><span class="tx">行李清单</span></div><span class="bg am">建议携带</span></div><div class="g2i"><div class="gs"><div class="gt">📄 必备品</div>' + mk(items1) + '</div><div class="gs"><div class="gt">👔 衣物/电子</div>' + mk(items2) + '</div></div><div class="fn">🌤 ' + tip + '</div></div></div>';
 }
-
+function renderVisaCard(v) {
+  var status = v && v.status ? v.status : "待查询";
+  var isFree = status && (status.indexOf("免签") > -1 || status === "无需签证");
+  var color = isFree ? "gn" : "am", txt = isFree ? "无需签证" : "需要办理";
+  var h = '<div class="card"><div class="th" style="border-bottom:1px solid var(--stone-200)"><div class="tl"><span class="ico">🛂</span><span class="tx">签证信息</span></div><span class="bg ' + color + '">' + txt + '</span></div><div class="vg"><div class="vi"><div class="vl">状态</div><div class="vv" style="color:' + (isFree ? "var(--em)" : "var(--amber)") + '">' + status + '</div></div>';
+  if (v && v.country) h += '<div class="vi"><div class="vl">目的地</div><div class="vv">' + v.country + '</div></div>';
+  if (v && v.processing_days) h += '<div class="vi"><div class="vl">办理时间</div><div class="vv">' + v.processing_days + '</div></div>';
+  if (v && v.fee) h += '<div class="vi"><div class="vl">费用</div><div class="vv">' + v.fee + '</div></div>';
+  h += '</div>';
+  if (v && v.notes) h += '<div class="vn">💡 ' + v.notes + '</div>';
+  return h + '</div>';
+}
+function renderCostTab(o) { return '<div class="g2">' + renderFlightTable(o.booking || {}) + renderHotelTable(o.booking || {}) + '</div>'; }
 function renderPackingTab(o) {
-    const packing = o.packing || {};
-    const categories = [
-        {key:"essentials", label:"📄 必备证件", items: packing.essentials || []},
-        {key:"clothing", label:"👔 衣物", items: packing.clothing || []},
-        {key:"electronics", label:"📱 电子产品", items: packing.electronics || []},
-        {key:"health", label:"💊 健康防护", items: packing.health || []},
-        {key:"other", label:"🎒 其他", items: packing.other || []},
-    ];
-
-    return `
-        <div class="report-card">
-            <div class="report-card-title">🎒 行李清单</div>
-            ${packing.weather_tip ? `<p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:12px;">🌤 ${packing.weather_tip}</p>` : ""}
-            <div class="packing-grid">
-                ${categories.filter(c => c.items.length > 0).map(c => `
-                    <div class="packing-category">
-                        <h4>${c.label}</h4>
-                        ${c.items.map(item => `<div class="packing-item">${item}</div>`).join("")}
-                    </div>
-                `).join("")}
-            </div>
-        </div>
-    `;
+  var p = o.packing || {};
+  function mk(arr) { var h = ""; for (var i = 0; i < (arr || []).length; i++) h += '<div class="it"><span class="ck">✓</span>' + arr[i] + '</div>'; return h; }
+  return '<div class="card"><div class="tc"><div class="thdr"><div class="tl"><span class="ico">🎒</span><span class="tx">行李清单</span></div></div><div class="g2i"><div class="gs"><div class="gt">📄 必备证件</div>' + mk(p.essentials) + '</div><div class="gs"><div class="gt">👔 穿搭建议</div>' + mk(p.clothing) + '</div></div><div class="g2i" style="margin-top:12px"><div class="gs"><div class="gt">📱 电子产品</div>' + mk(p.electronics) + '</div><div class="gs"><div class="gt">💊 健康防护</div>' + mk(p.health) + '</div></div></div></div>';
 }
-
 function renderInfoTab(o) {
-    const local = o.local || {};
-    const dest = o.destination || {};
-    return `
-        <div class="report-card">
-            <div class="report-card-title">📍 实用信息</div>
-            <div class="report-section">
-                <h4>基本信息</h4>
-                <p style="font-size:0.9rem;line-height:1.6;">
-                    ${local.country ? `🌏 国家: ${local.country}<br>` : ""}
-                    ${local.language ? `🗣 语言: ${local.language}<br>` : ""}
-                    ${local.currency ? `💵 货币: ${local.currency}<br>` : ""}
-                    ${local.timezone ? `🕐 时区: ${local.timezone}<br>` : ""}
-                    ${local.exchange_rate ? `💱 汇率: ${local.exchange_rate}` : ""}
-                </p>
-            </div>
-            ${dest.tips && dest.tips.length > 0 ? `
-            <div class="report-section">
-                <h4>💡 当地小贴士</h4>
-                <ul style="font-size:0.85rem;line-height:1.6;padding-left:16px;color:var(--text-secondary);">
-                    ${dest.tips.map(t => `<li style="margin-bottom:4px;">${t}</li>`).join("")}
-                </ul>
-            </div>` : ""}
-            ${local.emergency ? `
-            <div class="report-section">
-                <h4>🆘 紧急联系方式</h4>
-                <p style="font-size:0.9rem;line-height:1.6;">
-                    报警: ${local.emergency.police || "110"}<br>
-                    急救: ${local.emergency.ambulance || "120"}<br>
-                    使馆: ${local.emergency.embassy || "请查询当地使领馆"}
-                </p>
-            </div>` : ""}
-        </div>
-    `;
+  var local = o.local || {}, dest = o.destination || {}, h = '<div class="g2">';
+  h += '<div class="card"><div class="th" style="border-bottom:1px solid var(--stone-200)"><div class="tl"><span class="ico">📍</span><span class="tx">实用信息</span></div></div><div class="vg"><div class="vi"><div class="vl">国家</div><div class="vv">' + (local.country || dest.country || "") + '</div></div><div class="vi"><div class="vl">语言</div><div class="vv">' + (local.language || dest.language || "") + '</div></div><div class="vi"><div class="vl">货币</div><div class="vv">' + (local.currency || dest.currency || "") + '</div></div><div class="vi"><div class="vl">时区</div><div class="vv">' + (local.timezone || dest.timezone || "") + '</div></div></div></div>';
+  h += renderVisaCard(o.visa || {});
+  h += '</div>';
+  if (dest.tips && dest.tips.length > 0) {
+    h += '<div class="card" style="margin-top:12px;padding:16px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:18px">💡</span><span style="font-size:13px;font-weight:600">当地小贴士</span></div>';
+    for (var i = 0; i < dest.tips.length; i++) h += '<div style="font-size:12px;padding:4px 0;color:var(--stone-500)">• ' + dest.tips[i] + '</div>';
+    h += '</div>';
+  }
+  return h;
 }
-
-// === Input Auto-resize ===
-function autoResize(el) {
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 120) + "px";
-}
-
-// === Example Suggestions ===
-function useExample(text) {
-    document.getElementById("chatInput").value = text;
-    sendMessage();
-}
-
-// === Init ===
-document.addEventListener("DOMContentLoaded", function() {
-    initTheme();
-    initWorkflow();
-
-    // Enter to send
-    document.getElementById("chatInput").addEventListener("keydown", function(e) {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
-});
